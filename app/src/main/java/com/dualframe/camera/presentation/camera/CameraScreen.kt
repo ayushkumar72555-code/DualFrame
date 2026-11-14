@@ -245,10 +245,10 @@ fun CameraScreen(onBack: () -> Unit) {
                 }
                 /* stacked view content continues */
                 if (layoutMode == com.dualframe.camera.graphics.DualCompositionRenderer.Layout.STACKED) {
-                    Column(Modifier.fillMaxSize().padding(10.dp), verticalArrangement = Arrangement.SpaceBetween) {
-                        Box(Modifier.fillMaxWidth().weight(1f).border(1.dp, Color(0xFFFACC15), androidx.compose.foundation.shape.RoundedCornerShape(12.dp)), contentAlignment = Alignment.TopStart) { Text("16:9 LANDSCAPE", color = Color(0xFFFACC15), fontSize = 10.sp, modifier = Modifier.padding(8.dp)) }
+                    Column(Modifier.fillMaxSize().padding(10.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                        Box(Modifier.fillMaxWidth().aspectRatio(16f / 9f).border(1.dp, Color(0xFFFACC15), androidx.compose.foundation.shape.RoundedCornerShape(12.dp)), contentAlignment = Alignment.TopStart) { Text("16:9 LANDSCAPE", color = Color(0xFFFACC15), fontSize = 10.sp, modifier = Modifier.padding(8.dp)) }
                         Spacer(Modifier.height(8.dp))
-                        Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                             Box(Modifier.fillMaxHeight().aspectRatio(9f / 16f).border(1.dp, Color(0xFF34D399), androidx.compose.foundation.shape.RoundedCornerShape(12.dp)), contentAlignment = Alignment.TopStart) { Text("9:16 PORTRAIT", color = Color(0xFF34D399), fontSize = 10.sp, modifier = Modifier.padding(8.dp)) }
                         }
                     }
