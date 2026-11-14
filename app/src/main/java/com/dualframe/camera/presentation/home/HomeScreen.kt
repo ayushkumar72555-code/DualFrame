@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.MaterialTheme
@@ -29,7 +30,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-fun HomeScreen() {
+fun HomeScreen(
+    onOpenCamera: () -> Unit
+) {
     Scaffold(
         containerColor = MaterialTheme.colorScheme.background
     ) { paddingValues ->
@@ -101,6 +104,15 @@ fun HomeScreen() {
 
             Spacer(modifier = Modifier.height(28.dp))
 
+            Button(
+                onClick = onOpenCamera,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("OPEN CAMERA")
+            }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
             Card(
                 modifier = Modifier.fillMaxWidth(),
                 colors = CardDefaults.cardColors(
@@ -120,7 +132,7 @@ fun HomeScreen() {
                     Spacer(modifier = Modifier.height(12.dp))
 
                     Text(
-                        text = "Foundation initialized",
+                        text = "Camera foundation in progress",
                         color = MaterialTheme.colorScheme.onSurface,
                         fontWeight = FontWeight.SemiBold,
                         style = MaterialTheme.typography.titleMedium
@@ -129,7 +141,7 @@ fun HomeScreen() {
                     Spacer(modifier = Modifier.height(6.dp))
 
                     Text(
-                        text = "The camera pipeline will be introduced in an upcoming milestone.",
+                        text = "The live Camera2 viewfinder is being introduced. Dual composition and capture are separate upcoming milestones.",
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall
                     )

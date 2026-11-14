@@ -31,9 +31,9 @@ Clean Architecture with MVVM/MVI presentation.
 
 - Milestone 0: repository setup — completed.
 - Milestone 1: Android project foundation — implementation committed; local build verification pending.
-- Milestone 2: camera permissions and camera capability discovery — planned.
+- Milestone 2: runtime camera permission, Camera2 discovery, live preview, and front/rear switching — implementation committed; build and physical-device verification pending.
 
-See [Milestone 1 implementation and verification](docs/MILESTONE_1.md).
+See [Milestone 1](docs/MILESTONE_1.md) and [Milestone 2](docs/MILESTONE_2.md).
 
 ## Minimum Android version
 

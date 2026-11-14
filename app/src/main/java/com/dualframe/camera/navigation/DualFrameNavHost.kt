@@ -4,10 +4,12 @@ import androidx.compose.runtime.Composable
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.dualframe.camera.presentation.camera.CameraScreen
 import com.dualframe.camera.presentation.home.HomeScreen
 
 private object Routes {
     const val HOME = "home"
+    const val CAMERA = "camera"
 }
 
 @Composable
@@ -19,7 +21,14 @@ fun DualFrameNavHost() {
         startDestination = Routes.HOME
     ) {
         composable(Routes.HOME) {
-            HomeScreen()
+            HomeScreen(
+                onOpenCamera = { navController.navigate(Routes.CAMERA) }
+            )
+        }
+        composable(Routes.CAMERA) {
+            CameraScreen(
+                onBack = { navController.popBackStack() }
+            )
         }
     }
 }
