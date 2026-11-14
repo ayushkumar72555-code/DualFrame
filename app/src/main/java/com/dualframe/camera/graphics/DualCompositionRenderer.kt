@@ -18,6 +18,14 @@ class DualCompositionRenderer(
     private val onInputSurfaceChanged: (SurfaceTexture?) -> Unit
 ) : GLSurfaceView.Renderer {
 
+    enum class Layout { PIP, STACKED }
+    @Volatile var layout: Layout = Layout.PIP
+    @Volatile var swapped: Boolean = false
+    @Volatile var pipX: Float = 0.56f
+    @Volatile var pipY: Float = 0.075f
+    @Volatile var pipWidth: Float = 0.40f
+    @Volatile var zoom: Float = 1f
+
     companion object {
         private const val POSITION_ATTRIBUTE = 0
         private const val TEX_COORD_ATTRIBUTE = 1
@@ -46,9 +54,11 @@ class DualCompositionRenderer(
             uniform samplerExternalOES uCameraTexture;
             uniform vec4 uCrop;
             uniform float uBlur;
+            uniform float uZoom;
             varying vec2 vTexCoord;
             void main() {
-                vec2 uv = vTexCoord * uCrop.xy + uCrop.zw;
+                vec2 uv = (vTexCoord - vec2(0.5)) / uZoom + vec2(0.5);
+                uv = uv * uCrop.xy + uCrop.zw;
                 vec4 color = texture2D(uCameraTexture, uv) * 0.20;
                 color += texture2D(uCameraTexture, uv + vec2(0.006, 0.0)) * 0.10;
                 color += texture2D(uCameraTexture, uv - vec2(0.006, 0.0)) * 0.10;
@@ -132,28 +142,23 @@ class DualCompositionRenderer(
         GLES20.glEnableVertexAttribArray(TEX_COORD_ATTRIBUTE)
         GLES20.glVertexAttribPointer(TEX_COORD_ATTRIBUTE, 2, GLES20.GL_FLOAT, false, 16, vertexBuffer)
 
-        // The live feed fills the screen as a soft, enlarged backdrop.
-        drawPass(0, 0, surfaceWidth, surfaceHeight, surfaceWidth.toFloat() / surfaceHeight, 1f)
-
-        // Landscape frame near the top: x=5.5%, y=70%, w=89%, h=22%.
-        drawPass(
-            (surfaceWidth * 0.055f).toInt(),
-            (surfaceHeight * 0.70f).toInt(),
-            (surfaceWidth * 0.89f).toInt(),
-            (surfaceHeight * 0.22f).toInt(),
-            16f / 9f,
-            0f
-        )
-
-        // Portrait frame centred over the backdrop.
-        drawPass(
-            (surfaceWidth * 0.28f).toInt(),
-            (surfaceHeight * 0.31f).toInt(),
-            (surfaceWidth * 0.44f).toInt(),
-            (surfaceHeight * 0.49f).toInt(),
-            9f / 16f,
-            0f
-        )
+        if (layout == Layout.PIP) {
+            drawPass(0, 0, surfaceWidth, surfaceHeight, if (swapped) 16f / 9f else 9f / 16f, 0f)
+            val pipW = (surfaceWidth * pipWidth).toInt().coerceAtLeast(1)
+            val pipRatio = if (swapped) 9f / 16f else 16f / 9f
+            val pipH = (pipW / pipRatio).toInt().coerceAtLeast(1)
+            val px = (surfaceWidth * pipX).toInt().coerceIn(0, (surfaceWidth - pipW).coerceAtLeast(0))
+            val top = (surfaceHeight * pipY).toInt().coerceIn(0, (surfaceHeight - pipH).coerceAtLeast(0))
+            drawPass(px, surfaceHeight - top - pipH, pipW, pipH, pipRatio, 0f)
+        } else {
+            val pad = (surfaceHeight * 0.018f).toInt()
+            val gap = (surfaceHeight * 0.014f).toInt()
+            val panelH = (surfaceHeight - 2 * pad - gap) / 2
+            val landscapeW = (panelH * 16f / 9f).toInt().coerceAtMost(surfaceWidth - 2 * pad)
+            drawPass((surfaceWidth - landscapeW) / 2, surfaceHeight - pad - panelH, landscapeW, panelH, 16f / 9f, 0f)
+            val portraitW = (panelH * 9f / 16f).toInt().coerceAtMost(surfaceWidth - 2 * pad)
+            drawPass((surfaceWidth - portraitW) / 2, pad, portraitW, panelH, 9f / 16f, 0f)
+        }
 
         GLES20.glDisableVertexAttribArray(POSITION_ATTRIBUTE)
         GLES20.glDisableVertexAttribArray(TEX_COORD_ATTRIBUTE)
@@ -180,6 +185,7 @@ class DualCompositionRenderer(
             cropX, cropY, (1f - cropX) / 2f, (1f - cropY) / 2f
         )
         GLES20.glUniform1f(location("uBlur"), blur)
+        GLES20.glUniform1f(location("uZoom"), zoom.coerceIn(1f, 5f))
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
     }
 
@@ -246,6 +252,11 @@ class DualCompositionGLSurfaceView(context: android.content.Context) : GLSurface
         renderMode = RENDERMODE_WHEN_DIRTY
         dualRenderer.onFrameAvailableCallback = { requestRender() }
     }
+
+    fun setLayout(layout: DualCompositionRenderer.Layout, swapped: Boolean) { dualRenderer.layout = layout; dualRenderer.swapped = swapped; requestRender() }
+    fun setZoom(value: Float) { dualRenderer.zoom = value; requestRender() }
+    fun setPipPosition(x: Float, y: Float) { dualRenderer.pipX = x.coerceIn(0f, 0.75f); dualRenderer.pipY = y.coerceIn(0f, 0.8f); requestRender() }
+    fun setPipWidth(value: Float) { dualRenderer.pipWidth = value.coerceIn(0.30f, 0.50f); requestRender() }
 
     fun releaseCameraInput() {
         queueEvent { dualRenderer.releaseInputSurface() }
