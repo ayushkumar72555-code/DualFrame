@@ -7,7 +7,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
-import android.view.TextureView
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -48,20 +47,16 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.dualframe.camera.camera.Camera2PreviewController
 import com.dualframe.camera.camera.data.CameraCatalog
 import com.dualframe.camera.camera.model.CameraDescriptor
+import com.dualframe.camera.graphics.DualCompositionGLSurfaceView
 
 @Composable
-fun CameraScreen(
-    onBack: () -> Unit
-) {
+fun CameraScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val activity = context.findActivity()
     val lifecycleOwner = LocalLifecycleOwner.current
 
     var hasCameraPermission by remember {
-        mutableStateOf(
-            ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
-                PackageManager.PERMISSION_GRANTED
-        )
+        mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
     }
     var hasRequestedPermission by remember { mutableStateOf(false) }
     var cameras by remember { mutableStateOf<List<CameraDescriptor>>(emptyList()) }
@@ -71,7 +66,7 @@ fun CameraScreen(
     var previewStarted by remember { mutableStateOf(false) }
 
     val permissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
+        ActivityResultContracts.RequestPermission()
     ) { granted ->
         hasCameraPermission = granted
         if (!granted) previewStarted = false
@@ -90,23 +85,39 @@ fun CameraScreen(
         }
     }
 
-    DisposableEffect(lifecycleOwner, controller) {
-        val permissionObserver = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                hasCameraPermission =
-                    ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) ==
-                        PackageManager.PERMISSION_GRANTED
+    val glView = remember(context, controller) {
+        DualCompositionGLSurfaceView(context).apply {
+            onInputSurfaceChanged = { surfaceTexture ->
+                if (surfaceTexture == null) controller.detachInputSurface()
+                else controller.attachInputSurface(surfaceTexture)
             }
         }
-        lifecycleOwner.lifecycle.addObserver(controller)
-        lifecycleOwner.lifecycle.addObserver(permissionObserver)
+    }
+
+    DisposableEffect(lifecycleOwner, controller, glView) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> {
+                    glView.onResume()
+                    controller.start()
+                    hasCameraPermission = ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED
+                }
+                Lifecycle.Event.ON_PAUSE -> {
+                    controller.stop()
+                    glView.onPause()
+                }
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
         if (lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) {
+            glView.onResume()
             controller.start()
         }
         onDispose {
-            lifecycleOwner.lifecycle.removeObserver(controller)
-            lifecycleOwner.lifecycle.removeObserver(permissionObserver)
+            lifecycleOwner.lifecycle.removeObserver(observer)
             controller.release()
+            glView.releaseCameraInput()
         }
     }
 
@@ -138,40 +149,25 @@ fun CameraScreen(
     } ?: false
     val shouldOfferSettings = hasRequestedPermission && !hasCameraPermission && !showRationale
 
-    Scaffold(
-        containerColor = Color(0xFF101010)
-    ) { paddingValues ->
+    Scaffold(containerColor = Color(0xFF101010)) { paddingValues ->
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(horizontal = 20.dp, vertical = 12.dp)
+            modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 20.dp, vertical = 12.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TextButton(onClick = onBack) {
-                    Text("BACK")
-                }
-                Text(
-                    text = "DUALFRAME CAMERA",
-                    color = MaterialTheme.colorScheme.primary,
-                    style = MaterialTheme.typography.labelLarge
-                )
+                TextButton(onClick = onBack) { Text("BACK") }
+                Text("DUALFRAME CAMERA", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
             }
 
             if (!hasCameraPermission) {
                 Spacer(Modifier.height(32.dp))
-                Text(
-                    text = "Camera access needed",
-                    color = Color.White,
-                    style = MaterialTheme.typography.headlineSmall
-                )
+                Text("Camera access needed", color = Color.White, style = MaterialTheme.typography.headlineSmall)
                 Spacer(Modifier.height(10.dp))
                 Text(
-                    text = "DualFrame needs camera access to show the live viewfinder. No photo or video is captured in this milestone.",
+                    "DualFrame needs camera access to render two live compositions from one camera stream.",
                     color = Color.LightGray,
                     style = MaterialTheme.typography.bodyMedium
                 )
@@ -179,68 +175,54 @@ fun CameraScreen(
                 Button(onClick = {
                     hasRequestedPermission = true
                     permissionLauncher.launch(Manifest.permission.CAMERA)
-                }) {
-                    Text("Grant camera permission")
-                }
+                }) { Text("Grant camera permission") }
                 if (shouldOfferSettings) {
                     TextButton(onClick = {
-                        val intent = Intent(
-                            Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                            Uri.fromParts("package", context.packageName, null)
+                        context.startActivity(
+                            Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
                         )
-                        context.startActivity(intent)
-                    }) {
-                        Text("Open app settings")
-                    }
+                    }) { Text("Open app settings") }
                 }
                 Spacer(Modifier.weight(1f))
             } else {
                 Text(
-                    text = selectedCamera?.displayName ?: "Camera discovery",
+                    selectedCamera?.displayName ?: "Camera discovery",
                     color = Color.White,
                     style = MaterialTheme.typography.titleMedium
                 )
-                Text(
-                    text = selectedCamera?.let {
-                        "Hardware: ${it.hardwareLevel}  •  Flash: ${if (it.flashAvailable) "Available" else "Unavailable"}"
-                    } ?: (discoveryError ?: "Inspecting camera hardware..."),
-                    color = Color.LightGray,
-                    style = MaterialTheme.typography.bodySmall
-                )
+                val cameraInfo = selectedCamera?.let {
+                    "Hardware: " + it.hardwareLevel + "  •  Flash: " +
+                        if (it.flashAvailable) "Available" else "Unavailable"
+                } ?: (discoveryError ?: "Inspecting camera hardware...")
+                Text(cameraInfo, color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
                 Spacer(Modifier.height(12.dp))
 
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f)
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(Color.Black),
-                    contentAlignment = Alignment.Center
+                    modifier = Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(20.dp)).background(Color.Black)
                 ) {
-                    if (selectedCamera != null) {
-                        AndroidView(
-                            modifier = Modifier.fillMaxSize(),
-                            factory = { viewContext ->
-                                TextureView(viewContext).also(controller::attach)
-                            },
-                            update = {
-                                controller.selectCamera(selectedCamera)
-                            }
-                        )
-                        if (!previewStarted) {
-                            Text(
-                                text = previewError ?: "Starting live preview...",
-                                color = Color.White,
-                                modifier = Modifier
-                                    .align(Alignment.Center)
-                                    .padding(20.dp)
-                            )
-                        }
-                    } else {
+                    AndroidView(modifier = Modifier.fillMaxSize(), factory = { glView })
+
+                    Column(
+                        modifier = Modifier.fillMaxSize().padding(12.dp),
+                        verticalArrangement = Arrangement.SpaceBetween
+                    ) {
                         Text(
-                            text = discoveryError ?: "No camera available.",
+                            "PORTRAIT  •  9:16",
                             color = Color.White,
-                            modifier = Modifier.padding(24.dp)
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.background(Color(0x99000000), RoundedCornerShape(8.dp)).padding(horizontal = 10.dp, vertical = 6.dp)
+                        )
+                        Text(
+                            if (previewStarted) "ONE CAMERA STREAM  •  TWO COMPOSITIONS" else (previewError ?: "Waiting for camera input..."),
+                            color = if (previewStarted) MaterialTheme.colorScheme.primary else Color.White,
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.align(Alignment.CenterHorizontally).background(Color(0x99000000), RoundedCornerShape(8.dp)).padding(horizontal = 10.dp, vertical = 6.dp)
+                        )
+                        Text(
+                            "LANDSCAPE  •  16:9",
+                            color = Color.White,
+                            style = MaterialTheme.typography.labelMedium,
+                            modifier = Modifier.background(Color(0x99000000), RoundedCornerShape(8.dp)).padding(horizontal = 10.dp, vertical = 6.dp)
                         )
                     }
                 }
@@ -252,7 +234,7 @@ fun CameraScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = if (previewStarted) "LIVE PREVIEW" else "PREVIEW NOT RUNNING",
+                        if (previewStarted) "DUAL PREVIEW ACTIVE" else "PREVIEW NOT RUNNING",
                         color = if (previewStarted) MaterialTheme.colorScheme.primary else Color.LightGray,
                         style = MaterialTheme.typography.labelMedium
                     )
@@ -261,19 +243,21 @@ fun CameraScreen(
                             selectedCameraId = alternateCamera.id
                             previewStarted = false
                             previewError = null
-                        }) {
-                            Text("Switch camera")
-                        }
+                        }) { Text("Switch camera") }
                     }
                 }
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    text = "Camera preview only • Capture and dual composition arrive in later milestones",
+                    "Live OpenGL preview only • Photo and video capture are not implemented yet",
                     color = Color.Gray,
                     style = MaterialTheme.typography.bodySmall
                 )
             }
         }
+    }
+
+    LaunchedEffect(selectedCamera) {
+        selectedCamera?.let(controller::selectCamera)
     }
 }
 
