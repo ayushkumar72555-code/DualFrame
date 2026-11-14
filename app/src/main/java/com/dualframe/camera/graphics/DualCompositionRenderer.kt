@@ -11,8 +11,8 @@ import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 
 /**
- * Samples one Camera2 external texture and renders two independently cropped
- * compositions. The upper output is 9:16; the lower output is 16:9.
+ * Renders one camera texture as a blurred full-screen backdrop with two sharp,
+ * independently cropped composition windows layered over it.
  */
 class DualCompositionRenderer(
     private val onInputSurfaceChanged: (SurfaceTexture?) -> Unit
@@ -21,6 +21,7 @@ class DualCompositionRenderer(
     companion object {
         private const val POSITION_ATTRIBUTE = 0
         private const val TEX_COORD_ATTRIBUTE = 1
+        private const val SOURCE_RATIO = 16f / 9f
         private val VERTICES = floatArrayOf(
             -1f, -1f, 0f, 1f,
              1f, -1f, 1f, 1f,
@@ -44,10 +45,21 @@ class DualCompositionRenderer(
             precision mediump float;
             uniform samplerExternalOES uCameraTexture;
             uniform vec4 uCrop;
+            uniform float uBlur;
             varying vec2 vTexCoord;
             void main() {
                 vec2 uv = vTexCoord * uCrop.xy + uCrop.zw;
-                gl_FragColor = texture2D(uCameraTexture, uv);
+                vec4 color = texture2D(uCameraTexture, uv) * 0.20;
+                color += texture2D(uCameraTexture, uv + vec2(0.006, 0.0)) * 0.10;
+                color += texture2D(uCameraTexture, uv - vec2(0.006, 0.0)) * 0.10;
+                color += texture2D(uCameraTexture, uv + vec2(0.0, 0.006)) * 0.10;
+                color += texture2D(uCameraTexture, uv - vec2(0.0, 0.006)) * 0.10;
+                color += texture2D(uCameraTexture, uv + vec2(0.004, 0.004)) * 0.10;
+                color += texture2D(uCameraTexture, uv + vec2(-0.004, 0.004)) * 0.10;
+                color += texture2D(uCameraTexture, uv + vec2(0.004, -0.004)) * 0.10;
+                color += texture2D(uCameraTexture, uv + vec2(-0.004, -0.004)) * 0.10;
+                vec4 sharp = texture2D(uCameraTexture, uv);
+                gl_FragColor = mix(sharp, color, uBlur);
             }
         """
     }
@@ -74,11 +86,9 @@ class DualCompositionRenderer(
             it.release()
         }
         inputSurface = null
-
-        GLES20.glClearColor(0.035f, 0.035f, 0.035f, 1f)
+        GLES20.glClearColor(0f, 0f, 0f, 1f)
         programId = createProgram(VERTEX_SHADER, FRAGMENT_SHADER)
         textureId = createExternalTexture()
-
         inputSurface = SurfaceTexture(textureId).apply {
             setOnFrameAvailableListener {
                 frameAvailable = true
@@ -102,7 +112,7 @@ class DualCompositionRenderer(
                 cameraTexture.getTransformMatrix(textureMatrix)
                 frameAvailable = false
             } catch (_: RuntimeException) {
-                // Camera input can be replaced while a frame is pending.
+                // A camera surface may be replaced while a frame is pending.
             }
         }
 
@@ -112,11 +122,8 @@ class DualCompositionRenderer(
         GLES20.glUseProgram(programId)
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, textureId)
-        GLES20.glUniformMatrix4fv(
-            GLES20.glGetUniformLocation(programId, "uTextureMatrix"),
-            1, false, textureMatrix, 0
-        )
-        GLES20.glUniform1i(GLES20.glGetUniformLocation(programId, "uCameraTexture"), 0)
+        GLES20.glUniformMatrix4fv(location("uTextureMatrix"), 1, false, textureMatrix, 0)
+        GLES20.glUniform1i(location("uCameraTexture"), 0)
 
         vertexBuffer.position(0)
         GLES20.glEnableVertexAttribArray(POSITION_ATTRIBUTE)
@@ -125,8 +132,28 @@ class DualCompositionRenderer(
         GLES20.glEnableVertexAttribArray(TEX_COORD_ATTRIBUTE)
         GLES20.glVertexAttribPointer(TEX_COORD_ATTRIBUTE, 2, GLES20.GL_FLOAT, false, 16, vertexBuffer)
 
-        drawComposition(0, surfaceHeight / 2, surfaceWidth, surfaceHeight - surfaceHeight / 2, 9f / 16f)
-        drawComposition(0, 0, surfaceWidth, surfaceHeight / 2, 16f / 9f)
+        // The live feed fills the screen as a soft, enlarged backdrop.
+        drawPass(0, 0, surfaceWidth, surfaceHeight, surfaceWidth.toFloat() / surfaceHeight, 1f)
+
+        // Landscape frame near the top: x=5.5%, y=70%, w=89%, h=22%.
+        drawPass(
+            (surfaceWidth * 0.055f).toInt(),
+            (surfaceHeight * 0.70f).toInt(),
+            (surfaceWidth * 0.89f).toInt(),
+            (surfaceHeight * 0.22f).toInt(),
+            16f / 9f,
+            0f
+        )
+
+        // Portrait frame centred over the backdrop.
+        drawPass(
+            (surfaceWidth * 0.28f).toInt(),
+            (surfaceHeight * 0.20f).toInt(),
+            (surfaceWidth * 0.44f).toInt(),
+            (surfaceHeight * 0.49f).toInt(),
+            9f / 16f,
+            0f
+        )
 
         GLES20.glDisableVertexAttribArray(POSITION_ATTRIBUTE)
         GLES20.glDisableVertexAttribArray(TEX_COORD_ATTRIBUTE)
@@ -143,37 +170,20 @@ class DualCompositionRenderer(
         frameAvailable = false
     }
 
-    private fun drawComposition(x: Int, y: Int, width: Int, height: Int, targetRatio: Float) {
+    private fun drawPass(x: Int, y: Int, width: Int, height: Int, targetRatio: Float, blur: Float) {
         if (width <= 0 || height <= 0) return
-
-        val areaRatio = width.toFloat() / height
-        val viewportWidth: Int
-        val viewportHeight: Int
-        if (areaRatio > targetRatio) {
-            viewportHeight = height
-            viewportWidth = (height * targetRatio).toInt().coerceAtLeast(1)
-        } else {
-            viewportWidth = width
-            viewportHeight = (width / targetRatio).toInt().coerceAtLeast(1)
-        }
-
-        GLES20.glViewport(
-            x + (width - viewportWidth) / 2,
-            y + (height - viewportHeight) / 2,
-            viewportWidth,
-            viewportHeight
-        )
-
-        // Camera2 input is selected as 16:9 (or the closest available ratio).
-        val sourceRatio = 16f / 9f
-        val cropX = if (sourceRatio > targetRatio) targetRatio / sourceRatio else 1f
-        val cropY = if (sourceRatio < targetRatio) sourceRatio / targetRatio else 1f
+        GLES20.glViewport(x, y, width, height)
+        val cropX = if (SOURCE_RATIO > targetRatio) targetRatio / SOURCE_RATIO else 1f
+        val cropY = if (SOURCE_RATIO < targetRatio) SOURCE_RATIO / targetRatio else 1f
         GLES20.glUniform4f(
-            GLES20.glGetUniformLocation(programId, "uCrop"),
+            location("uCrop"),
             cropX, cropY, (1f - cropX) / 2f, (1f - cropY) / 2f
         )
+        GLES20.glUniform1f(location("uBlur"), blur)
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
     }
+
+    private fun location(name: String) = GLES20.glGetUniformLocation(programId, name)
 
     private fun createExternalTexture(): Int {
         val textures = IntArray(1)
@@ -195,7 +205,6 @@ class DualCompositionRenderer(
         GLES20.glBindAttribLocation(program, POSITION_ATTRIBUTE, "aPosition")
         GLES20.glBindAttribLocation(program, TEX_COORD_ATTRIBUTE, "aTexCoord")
         GLES20.glLinkProgram(program)
-
         val status = IntArray(1)
         GLES20.glGetProgramiv(program, GLES20.GL_LINK_STATUS, status, 0)
         if (status[0] == 0) {

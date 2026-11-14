@@ -10,19 +10,23 @@ import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -36,8 +40,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -48,6 +55,9 @@ import com.dualframe.camera.camera.Camera2PreviewController
 import com.dualframe.camera.camera.data.CameraCatalog
 import com.dualframe.camera.camera.model.CameraDescriptor
 import com.dualframe.camera.graphics.DualCompositionGLSurfaceView
+
+private val CameraWhite = Color(0xFFF7F7F7)
+private val CameraBlack = Color(0xFF050505)
 
 @Composable
 fun CameraScreen(onBack: () -> Unit) {
@@ -64,10 +74,10 @@ fun CameraScreen(onBack: () -> Unit) {
     var discoveryError by remember { mutableStateOf<String?>(null) }
     var previewError by remember { mutableStateOf<String?>(null) }
     var previewStarted by remember { mutableStateOf(false) }
+    var showSettings by remember { mutableStateOf(false) }
+    var isVideoMode by remember { mutableStateOf(false) }
 
-    val permissionLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.RequestPermission()
-    ) { granted ->
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         hasCameraPermission = granted
         if (!granted) previewStarted = false
     }
@@ -149,115 +159,173 @@ fun CameraScreen(onBack: () -> Unit) {
     } ?: false
     val shouldOfferSettings = hasRequestedPermission && !hasCameraPermission && !showRationale
 
-    Scaffold(containerColor = Color(0xFF101010)) { paddingValues ->
-        Column(
-            modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 20.dp, vertical = 12.dp)
-        ) {
+    Box(modifier = Modifier.fillMaxSize().background(CameraBlack)) {
+        if (hasCameraPermission) {
+            AndroidView(modifier = Modifier.fillMaxSize(), factory = { glView })
+            // A subtle lower gradient keeps the camera controls readable.
+            Box(
+                modifier = Modifier.fillMaxSize().background(
+                    brush = androidx.compose.ui.graphics.Brush.verticalGradient(
+                        0f to Color(0x55000000),
+                        0.16f to Color.Transparent,
+                        0.72f to Color.Transparent,
+                        1f to Color(0xB8000000)
+                    )
+                )
+            )
+
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                val frameWidth = maxWidth * 0.89f
+                val frameHeight = frameWidth * 9f / 16f
+                Box(
+                    modifier = Modifier
+                        .offset(x = maxWidth * 0.055f, y = maxHeight * 0.07f)
+                        .size(width = frameWidth, height = frameHeight)
+                        .border(2.dp, CameraBlack, androidx.compose.foundation.shape.RoundedCornerShape(5.dp))
+                )
+                Text(
+                    "16:9",
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .offset(x = (-maxWidth * 0.10f), y = maxHeight * 0.072f),
+                    color = CameraBlack,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                Box(
+                    modifier = Modifier
+                        .offset(x = maxWidth * 0.28f, y = maxHeight * 0.20f)
+                        .size(width = maxWidth * 0.44f, height = maxHeight * 0.49f)
+                        .border(2.dp, CameraBlack, androidx.compose.foundation.shape.RoundedCornerShape(5.dp))
+                )
+                Text(
+                    "9:16",
+                    modifier = Modifier
+                        .offset(x = maxWidth * 0.63f, y = maxHeight * 0.205f),
+                    color = CameraBlack,
+                    fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
             Row(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp, top = 12.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                TextButton(onClick = onBack) { Text("BACK") }
-                Text("DUALFRAME CAMERA", color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.labelLarge)
+                CameraTopIcon("⚙", "Settings") { showSettings = true }
+                Text(
+                    if (isVideoMode) "Video" else "Photo",
+                    color = CameraWhite,
+                    fontSize = 25.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                CameraTopIcon("↻", "Switch camera") {
+                    alternateCamera?.let {
+                        selectedCameraId = it.id
+                        previewStarted = false
+                        previewError = null
+                    }
+                }
             }
 
-            if (!hasCameraPermission) {
-                Spacer(Modifier.height(32.dp))
-                Text("Camera access needed", color = Color.White, style = MaterialTheme.typography.headlineSmall)
-                Spacer(Modifier.height(10.dp))
+            Row(
+                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
+                    .padding(start = 28.dp, end = 28.dp, bottom = 28.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier.size(66.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(3.dp))
+                        .background(Color(0x55222222)).border(1.dp, Color(0x99FFFFFF)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("▧", color = CameraWhite, fontSize = 28.sp)
+                }
+
+                Box(
+                    modifier = Modifier.size(104.dp).clip(CircleShape)
+                        .border(3.dp, CameraWhite, CircleShape).padding(7.dp)
+                        .border(2.dp, CameraWhite, CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(modifier = Modifier.size(54.dp).clip(CircleShape).background(CameraWhite))
+                }
+
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.clickable { isVideoMode = !isVideoMode }
+                ) {
+                    Text("▣", color = CameraWhite, fontSize = 34.sp)
+                    Text(if (isVideoMode) "PHOTO" else "VIDEO", color = CameraWhite, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
+                }
+            }
+
+            if (!previewStarted) {
                 Text(
-                    "DualFrame needs camera access to render two live compositions from one camera stream.",
+                    previewError ?: discoveryError ?: "Waiting for camera…",
+                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 112.dp),
+                    color = CameraWhite,
+                    fontSize = 11.sp,
+                    textAlign = TextAlign.Center
+                )
+            }
+
+            if (showSettings) {
+                AlertDialog(
+                    onDismissRequest = { showSettings = false },
+                    title = { Text("Camera settings") },
+                    text = {
+                        Text(
+                            "DualFrame preview\nLandscape: 16:9\nPortrait: 9:16\nCamera: ${selectedCamera?.displayName ?: "Not selected"}\n\nCapture and recording controls will be connected in a later milestone."
+                        )
+                    },
+                    confirmButton = {
+                        TextButton(onClick = { showSettings = false }) { Text("Done") }
+                    }
+                )
+            }
+        } else {
+            Column(
+                modifier = Modifier.align(Alignment.Center).padding(32.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                Text("Camera access needed", color = CameraWhite, style = MaterialTheme.typography.headlineSmall)
+                Spacer(Modifier.height(12.dp))
+                Text(
+                    "DualFrame needs camera access to show both compositions from one live camera feed.",
                     color = Color.LightGray,
-                    style = MaterialTheme.typography.bodyMedium
+                    textAlign = TextAlign.Center
                 )
                 Spacer(Modifier.height(20.dp))
-                Button(onClick = {
+                TextButton(onClick = {
                     hasRequestedPermission = true
                     permissionLauncher.launch(Manifest.permission.CAMERA)
-                }) { Text("Grant camera permission") }
+                }) { Text("Grant camera permission", color = CameraWhite) }
                 if (shouldOfferSettings) {
                     TextButton(onClick = {
                         context.startActivity(
                             Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null))
                         )
-                    }) { Text("Open app settings") }
+                    }) { Text("Open app settings", color = CameraWhite) }
                 }
-                Spacer(Modifier.weight(1f))
-            } else {
-                Text(
-                    selectedCamera?.displayName ?: "Camera discovery",
-                    color = Color.White,
-                    style = MaterialTheme.typography.titleMedium
-                )
-                val cameraInfo = selectedCamera?.let {
-                    "Hardware: " + it.hardwareLevel + "  •  Flash: " +
-                        if (it.flashAvailable) "Available" else "Unavailable"
-                } ?: (discoveryError ?: "Inspecting camera hardware...")
-                Text(cameraInfo, color = Color.LightGray, style = MaterialTheme.typography.bodySmall)
-                Spacer(Modifier.height(12.dp))
-
-                Box(
-                    modifier = Modifier.fillMaxWidth().weight(1f).clip(RoundedCornerShape(20.dp)).background(Color.Black)
-                ) {
-                    AndroidView(modifier = Modifier.fillMaxSize(), factory = { glView })
-
-                    Column(
-                        modifier = Modifier.fillMaxSize().padding(12.dp),
-                        verticalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(
-                            "PORTRAIT  •  9:16",
-                            color = Color.White,
-                            style = MaterialTheme.typography.labelMedium,
-                            modifier = Modifier.background(Color(0x99000000), RoundedCornerShape(8.dp)).padding(horizontal = 10.dp, vertical = 6.dp)
-                        )
-                        Text(
-                            if (previewStarted) "ONE CAMERA STREAM  •  TWO COMPOSITIONS" else (previewError ?: "Waiting for camera input..."),
-                            color = if (previewStarted) MaterialTheme.colorScheme.primary else Color.White,
-                            style = MaterialTheme.typography.labelSmall,
-                            modifier = Modifier.align(Alignment.CenterHorizontally).background(Color(0x99000000), RoundedCornerShape(8.dp)).padding(horizontal = 10.dp, vertical = 6.dp)
-                        )
-                        Text(
-                            "LANDSCAPE  •  16:9",
-                            color = Color.White,
-                            style = MaterialTheme.typography.labelMedium,
-                            modifier = Modifier.background(Color(0x99000000), RoundedCornerShape(8.dp)).padding(horizontal = 10.dp, vertical = 6.dp)
-                        )
-                    }
-                }
-
-                Spacer(Modifier.height(14.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        if (previewStarted) "DUAL PREVIEW ACTIVE" else "PREVIEW NOT RUNNING",
-                        color = if (previewStarted) MaterialTheme.colorScheme.primary else Color.LightGray,
-                        style = MaterialTheme.typography.labelMedium
-                    )
-                    if (alternateCamera != null) {
-                        Button(onClick = {
-                            selectedCameraId = alternateCamera.id
-                            previewStarted = false
-                            previewError = null
-                        }) { Text("Switch camera") }
-                    }
-                }
-                Spacer(Modifier.height(8.dp))
-                Text(
-                    "Live OpenGL preview only • Photo and video capture are not implemented yet",
-                    color = Color.Gray,
-                    style = MaterialTheme.typography.bodySmall
-                )
+                TextButton(onClick = onBack) { Text("Back", color = CameraWhite) }
             }
         }
     }
 
     LaunchedEffect(selectedCamera) {
         selectedCamera?.let(controller::selectCamera)
+    }
+}
+
+@Composable
+private fun CameraTopIcon(symbol: String, description: String, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier.size(48.dp).clip(CircleShape).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(symbol, color = CameraWhite, fontSize = 31.sp, textAlign = TextAlign.Center)
     }
 }
 
