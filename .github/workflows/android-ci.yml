@@ -21,24 +21,27 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
 
-      # GitHub's ubuntu-latest image already includes the Android SDK and
-      # command-line tools. Avoid android-actions/setup-android@v3: that
-      # action invokes 'sdkmanager tools', an obsolete package that causes
-      # the workflow to fail before Gradle can start.
+      # GitHub-hosted Ubuntu images include the Android SDK. Resolve
+      # sdkmanager from the installed command-line-tools directory because
+      # it is not guaranteed to be on PATH.
       - name: Install Android SDK 37
         shell: bash
         run: |
           set -euo pipefail
-          echo "ANDROID_HOME=${ANDROID_HOME:-unset}"
-          command -v sdkmanager
-          sdkmanager --version
-          yes | sdkmanager --licenses > /dev/null || true
-          sdkmanager --install "platforms;android-37" "build-tools;36.0.0"
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager -print -quit)"
+          if [[ -z "$SDKMANAGER" ]]; then
+            echo "::error::sdkmanager was not found under $ANDROID_HOME/cmdline-tools"
+            find "$ANDROID_HOME" -maxdepth 4 -type d -print | head -100
+            exit 1
+          fi
+          echo "Using SDK manager: $SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses > /dev/null || true
+          "$SDKMANAGER" --install "platforms;android-37" "build-tools;36.0.0"
 
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
