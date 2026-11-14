@@ -34,6 +34,9 @@ class Camera2PreviewController(context: Context) : DefaultLifecycleObserver {
     private var captureSession: CameraCaptureSession? = null
     private var previewSurface: Surface? = null
     private var isStarted = false
+    private var previewRequestBuilder: CaptureRequest.Builder? = null
+    private var flashMode: String = "OFF"
+    private var exposureEv: Float = 0f
     private var isOpening = false
     private var openGeneration = 0
 
@@ -61,6 +64,10 @@ class Camera2PreviewController(context: Context) : DefaultLifecycleObserver {
         closeCamera()
         openCameraIfReady()
     }
+
+    fun setFlashMode(mode: String) { handler.post { flashMode = mode; applyRepeatingControls() } }
+
+    fun setExposureCompensation(ev: Float) { handler.post { exposureEv = ev.coerceIn(-2f, 2f); applyRepeatingControls() } }
 
     fun start() {
         isStarted = true
@@ -168,6 +175,8 @@ class Camera2PreviewController(context: Context) : DefaultLifecycleObserver {
                 set(CaptureRequest.CONTROL_AF_MODE, CaptureRequest.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
                 set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
             }
+            previewRequestBuilder = requestBuilder
+            applyControls(requestBuilder)
 
             camera.createCaptureSession(
                 listOf(surface),
@@ -201,8 +210,44 @@ class Camera2PreviewController(context: Context) : DefaultLifecycleObserver {
     private fun closeSession() {
         captureSession?.close()
         captureSession = null
+        previewRequestBuilder = null
         previewSurface?.release()
         previewSurface = null
+    }
+
+
+    private fun applyRepeatingControls() {
+        val builder = previewRequestBuilder ?: return
+        applyControls(builder)
+        val session = captureSession ?: return
+        try { session.setRepeatingRequest(builder.build(), null, handler) }
+        catch (exception: Exception) { onPreviewError?.invoke(exception.message ?: "Unable to update camera controls.") }
+    }
+
+    private fun applyControls(builder: CaptureRequest.Builder) {
+        val id = selectedCamera?.id ?: return
+        val characteristics = try { cameraManager.getCameraCharacteristics(id) } catch (_: Exception) { return }
+        val hasFlash = characteristics.get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
+        when (flashMode) {
+            "AUTO" -> {
+                builder.set(CaptureRequest.CONTROL_AE_MODE, if (hasFlash) CaptureRequest.CONTROL_AE_MODE_ON_AUTO_FLASH else CaptureRequest.CONTROL_AE_MODE_ON)
+                builder.set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_OFF)
+            }
+            "ON" -> {
+                builder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
+                builder.set(CaptureRequest.FLASH_MODE, if (hasFlash) CaptureRequest.FLASH_MODE_TORCH else CaptureRequest.FLASH_MODE_OFF)
+            }
+            else -> {
+                builder.set(CaptureRequest.CONTROL_AE_MODE, CaptureRequest.CONTROL_AE_MODE_ON)
+                builder.set(CaptureRequest.FLASH_MODE, CaptureRequest.FLASH_MODE_OFF)
+            }
+        }
+        val range = characteristics.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_RANGE)
+        val step = characteristics.get(CameraCharacteristics.CONTROL_AE_COMPENSATION_STEP)
+        if (range != null && step != null && step.toFloat() > 0f) {
+            val index = (exposureEv / step.toFloat()).toInt().coerceIn(range.lower, range.upper)
+            builder.set(CaptureRequest.CONTROL_AE_EXPOSURE_COMPENSATION, index)
+        }
     }
 
     private fun closeCamera() {
