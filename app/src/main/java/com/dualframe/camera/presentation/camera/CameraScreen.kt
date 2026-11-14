@@ -97,6 +97,8 @@ fun CameraScreen(onBack: () -> Unit) {
     var previewStarted by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     var isVideoMode by remember { mutableStateOf(false) }
+    var flashMode by remember { mutableStateOf("OFF") }
+    var exposureEv by remember { mutableStateOf(0f) }
     var layoutMode by remember { mutableStateOf(com.dualframe.camera.graphics.DualCompositionRenderer.Layout.PIP) }
     var pipSwapped by remember { mutableStateOf(false) }
     var pipX by remember { mutableStateOf(0.56f) }
@@ -260,13 +262,14 @@ fun CameraScreen(onBack: () -> Unit) {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                CameraTopIcon("⚙", "Settings") { showSettings = true }
+                CameraTopIcon(if (flashMode == "OFF") "ϟ" else "ϟ+", "Flash: $flashMode") { flashMode = when (flashMode) { "OFF" -> "AUTO"; "AUTO" -> "ON"; else -> "OFF" } }
                 Text(
                     if (isVideoMode) "Video" else "Photo",
                     color = CameraWhite,
                     fontSize = 25.sp,
                     fontWeight = FontWeight.Bold
                 )
+                CameraTopIcon("⚙", "Settings") { showSettings = true }
                 CameraTopIcon("↻", "Switch camera") {
                     alternateCamera?.let {
                         selectedCameraId = it.id
@@ -286,6 +289,11 @@ fun CameraScreen(onBack: () -> Unit) {
             }
             Row(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 25.dp, vertical = 122.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
                 listOf(0.6f, 1f, 2f, 5f).forEach { factor -> Text("${factor}x", color = if (zoom == factor) Color(0xFFFACC15) else CameraWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { zoom = factor }.padding(horizontal = 9.dp, vertical = 5.dp)) }
+            }
+            Row(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 28.dp, vertical = 112.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("EV", color = CameraWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                androidx.compose.material3.Slider(value = exposureEv, onValueChange = { exposureEv = it }, valueRange = -2f..2f, modifier = Modifier.weight(1f))
+                Text(if (exposureEv > 0) "+%.1f".format(exposureEv) else "%.1f".format(exposureEv), color = Color(0xFFFACC15), fontSize = 10.sp)
             }
             Row(
                 modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
@@ -375,6 +383,8 @@ fun CameraScreen(onBack: () -> Unit) {
     LaunchedEffect(selectedCamera) {
         selectedCamera?.let(controller::selectCamera)
     }
+    LaunchedEffect(flashMode) { controller.setFlashMode(flashMode) }
+    LaunchedEffect(exposureEv) { controller.setExposureCompensation(exposureEv) }
     LaunchedEffect(layoutMode, pipSwapped) { glView.setLayout(layoutMode, pipSwapped) }
     LaunchedEffect(pipX, pipY) { glView.setPipPosition(pipX, pipY) }
     LaunchedEffect(pipSizeIndex) { glView.setPipWidth(pipWidths[pipSizeIndex]) }
