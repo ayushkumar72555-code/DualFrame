@@ -22,6 +22,9 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
@@ -92,6 +95,14 @@ fun CameraScreen(onBack: () -> Unit) {
     var previewStarted by remember { mutableStateOf(false) }
     var showSettings by remember { mutableStateOf(false) }
     var isVideoMode by remember { mutableStateOf(false) }
+    var layoutMode by remember { mutableStateOf(com.dualframe.camera.graphics.DualCompositionRenderer.Layout.PIP) }
+    var pipSwapped by remember { mutableStateOf(false) }
+    var pipX by remember { mutableStateOf(0.56f) }
+    var pipY by remember { mutableStateOf(0.075f) }
+    var pipSizeIndex by remember { mutableStateOf(1) }
+    var zoom by remember { mutableStateOf(1f) }
+    var showGrid by remember { mutableStateOf(true) }
+    val pipWidths = listOf(0.32f, 0.40f, 0.48f)
 
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
         hasCameraPermission = granted
@@ -191,37 +202,40 @@ fun CameraScreen(onBack: () -> Unit) {
             )
 
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                val frameWidth = maxWidth * 0.89f
-                val frameHeight = maxHeight * 0.22f
-                Box(
-                    modifier = Modifier
-                        .offset(x = maxWidth * 0.055f, y = maxHeight * 0.08f)
-                        .size(width = frameWidth, height = frameHeight)
-                        .border(2.dp, CameraBlack, androidx.compose.foundation.shape.RoundedCornerShape(5.dp))
-                )
-                Text(
-                    "16:9",
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .offset(x = (-maxWidth * 0.10f), y = maxHeight * 0.082f),
-                    color = CameraBlack,
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Box(
-                    modifier = Modifier
-                        .offset(x = maxWidth * 0.28f, y = maxHeight * 0.31f)
-                        .size(width = maxWidth * 0.44f, height = maxHeight * 0.49f)
-                        .border(2.dp, CameraBlack, androidx.compose.foundation.shape.RoundedCornerShape(5.dp))
-                )
-                Text(
-                    "9:16",
-                    modifier = Modifier
-                        .offset(x = maxWidth * 0.63f, y = maxHeight * 0.315f),
-                    color = CameraBlack,
-                    fontSize = 18.sp,
-                    fontWeight = FontWeight.Bold
-                )
+                val density = LocalDensity.current.density
+                val pipWidth = maxWidth * pipWidths[pipSizeIndex]
+                val pipHeight = pipWidth * (if (pipSwapped) 16f / 9f else 9f / 16f)
+                if (layoutMode == com.dualframe.camera.graphics.DualCompositionRenderer.Layout.PIP) {
+                    Box(
+                        modifier = Modifier.offset(x = maxWidth * pipX, y = maxHeight * pipY)
+                            .size(width = pipWidth, height = pipHeight)
+                            .border(2.dp, Color(0xFFFACC15), androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
+                            .pointerInput(maxWidth, maxHeight) {
+                                detectDragGestures { change, drag ->
+                                    change.consume()
+                                    pipX = (pipX + drag.x / (maxWidth.value * density)).coerceIn(0f, 1f - pipWidths[pipSizeIndex])
+                                    pipY = (pipY + drag.y / (maxHeight.value * density)).coerceIn(0f, 0.78f)
+                                }
+                            },
+                        contentAlignment = Alignment.TopCenter
+                    ) {
+                        Row(Modifier.fillMaxWidth().background(Color(0xDD08090B)).padding(horizontal = 7.dp, vertical = 5.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                            Text(if (pipSwapped) "9:16 PORTRAIT" else "16:9 LANDSCAPE", color = Color(0xFFFACC15), fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                            Row {
+                                Text("↔", color = CameraWhite, modifier = Modifier.clickable { pipSwapped = !pipSwapped }.padding(horizontal = 6.dp))
+                                Text("＋", color = CameraWhite, modifier = Modifier.clickable { pipSizeIndex = (pipSizeIndex + 1) % pipWidths.size }.padding(horizontal = 4.dp))
+                            }
+                        }
+                    }
+                } else {
+                    Column(Modifier.fillMaxSize().padding(10.dp), verticalArrangement = Arrangement.SpaceBetween) {
+                        Box(Modifier.fillMaxWidth().weight(1f).border(1.dp, Color(0xFFFACC15), androidx.compose.foundation.shape.RoundedCornerShape(12.dp)), contentAlignment = Alignment.TopStart) { Text("16:9 LANDSCAPE", color = Color(0xFFFACC15), fontSize = 10.sp, modifier = Modifier.padding(8.dp)) }
+                        Spacer(Modifier.height(8.dp))
+                        Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                            Box(Modifier.fillMaxHeight().aspectRatio(9f / 16f).border(1.dp, Color(0xFF34D399), androidx.compose.foundation.shape.RoundedCornerShape(12.dp)), contentAlignment = Alignment.TopStart) { Text("9:16 PORTRAIT", color = Color(0xFF34D399), fontSize = 10.sp, modifier = Modifier.padding(8.dp)) }
+                        }
+                    }
+                }
             }
 
             Row(
@@ -245,6 +259,17 @@ fun CameraScreen(onBack: () -> Unit) {
                 }
             }
 
+            Row(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 18.dp, vertical = 82.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                listOf("PiP", "STACKED").forEachIndexed { index, label ->
+                    val active = if (index == 0) layoutMode == com.dualframe.camera.graphics.DualCompositionRenderer.Layout.PIP else layoutMode == com.dualframe.camera.graphics.DualCompositionRenderer.Layout.STACKED
+                    Text(label, color = if (active) Color.Black else CameraWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.padding(horizontal = 4.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(18.dp)).background(if (active) Color(0xFFFACC15) else Color(0x99202020)).clickable { layoutMode = if (index == 0) com.dualframe.camera.graphics.DualCompositionRenderer.Layout.PIP else com.dualframe.camera.graphics.DualCompositionRenderer.Layout.STACKED }.padding(horizontal = 13.dp, vertical = 8.dp))
+                }
+                Text("SWAP", color = Color(0xFFFACC15), fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { pipSwapped = !pipSwapped }.padding(horizontal = 10.dp, vertical = 8.dp))
+                Text("GRID", color = if (showGrid) Color(0xFFFACC15) else CameraWhite, fontSize = 10.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { showGrid = !showGrid }.padding(horizontal = 6.dp, vertical = 8.dp))
+            }
+            Row(Modifier.align(Alignment.BottomCenter).fillMaxWidth().padding(horizontal = 25.dp, vertical = 122.dp), horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically) {
+                listOf(0.6f, 1f, 2f, 5f).forEach { factor -> Text("${factor}x", color = if (zoom == factor) Color(0xFFFACC15) else CameraWhite, fontSize = 11.sp, fontWeight = FontWeight.Bold, modifier = Modifier.clickable { zoom = factor }.padding(horizontal = 9.dp, vertical = 5.dp)) }
+            }
             Row(
                 modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
                     .padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
@@ -333,6 +358,10 @@ fun CameraScreen(onBack: () -> Unit) {
     LaunchedEffect(selectedCamera) {
         selectedCamera?.let(controller::selectCamera)
     }
+    LaunchedEffect(layoutMode, pipSwapped) { glView.setLayout(layoutMode, pipSwapped) }
+    LaunchedEffect(pipX, pipY) { glView.setPipPosition(pipX, pipY) }
+    LaunchedEffect(pipSizeIndex) { glView.setPipWidth(pipWidths[pipSizeIndex]) }
+    LaunchedEffect(zoom) { glView.setZoom(zoom) }
 }
 
 @Composable
