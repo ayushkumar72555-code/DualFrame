@@ -9,13 +9,13 @@ android {
     namespace = "com.dualframe.camera"
 
     compileSdk {
-        version = release(37)
+        version = release(36)
     }
 
     defaultConfig {
         applicationId = "com.dualframe.camera"
         minSdk = 26
-        targetSdk = 37
+        targetSdk = 36
         versionCode = 1
         versionName = "1.0"
 
