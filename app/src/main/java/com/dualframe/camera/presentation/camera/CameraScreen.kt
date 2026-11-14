@@ -48,6 +48,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -64,6 +66,20 @@ fun CameraScreen(onBack: () -> Unit) {
     val context = LocalContext.current
     val activity = context.findActivity()
     val lifecycleOwner = LocalLifecycleOwner.current
+
+    // Hide system bars while the camera is open, then restore them on exit.
+    DisposableEffect(activity) {
+        val window = activity?.window
+        val insetsController = window?.let {
+            WindowCompat.getInsetsController(it, it.decorView)
+        }
+        insetsController?.systemBarsBehavior =
+            androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+        insetsController?.hide(WindowInsetsCompat.Type.systemBars())
+        onDispose {
+            insetsController?.show(WindowInsetsCompat.Type.systemBars())
+        }
+    }
 
     var hasCameraPermission by remember {
         mutableStateOf(ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED)
@@ -166,10 +182,10 @@ fun CameraScreen(onBack: () -> Unit) {
             Box(
                 modifier = Modifier.fillMaxSize().background(
                     brush = androidx.compose.ui.graphics.Brush.verticalGradient(
-                        0f to Color(0x55000000),
+                        0f to Color(0x66000000),
                         0.16f to Color.Transparent,
                         0.72f to Color.Transparent,
-                        1f to Color(0xB8000000)
+                        1f to Color(0xCC000000)
                     )
                 )
             )
@@ -179,7 +195,7 @@ fun CameraScreen(onBack: () -> Unit) {
                 val frameHeight = maxHeight * 0.22f
                 Box(
                     modifier = Modifier
-                        .offset(x = maxWidth * 0.055f, y = maxHeight * 0.07f)
+                        .offset(x = maxWidth * 0.055f, y = maxHeight * 0.08f)
                         .size(width = frameWidth, height = frameHeight)
                         .border(2.dp, CameraBlack, androidx.compose.foundation.shape.RoundedCornerShape(5.dp))
                 )
@@ -187,21 +203,21 @@ fun CameraScreen(onBack: () -> Unit) {
                     "16:9",
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .offset(x = (-maxWidth * 0.10f), y = maxHeight * 0.072f),
+                        .offset(x = (-maxWidth * 0.10f), y = maxHeight * 0.082f),
                     color = CameraBlack,
                     fontSize = 22.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Box(
                     modifier = Modifier
-                        .offset(x = maxWidth * 0.28f, y = maxHeight * 0.20f)
+                        .offset(x = maxWidth * 0.28f, y = maxHeight * 0.31f)
                         .size(width = maxWidth * 0.44f, height = maxHeight * 0.49f)
                         .border(2.dp, CameraBlack, androidx.compose.foundation.shape.RoundedCornerShape(5.dp))
                 )
                 Text(
                     "9:16",
                     modifier = Modifier
-                        .offset(x = maxWidth * 0.63f, y = maxHeight * 0.205f),
+                        .offset(x = maxWidth * 0.63f, y = maxHeight * 0.315f),
                     color = CameraBlack,
                     fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
@@ -231,12 +247,12 @@ fun CameraScreen(onBack: () -> Unit) {
 
             Row(
                 modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()
-                    .padding(start = 28.dp, end = 28.dp, bottom = 28.dp),
+                    .padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Box(
-                    modifier = Modifier.size(66.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(3.dp))
+                    modifier = Modifier.size(56.dp).clip(androidx.compose.foundation.shape.RoundedCornerShape(3.dp))
                         .background(Color(0x55222222)).border(1.dp, Color(0x99FFFFFF)),
                     contentAlignment = Alignment.Center
                 ) {
@@ -244,19 +260,19 @@ fun CameraScreen(onBack: () -> Unit) {
                 }
 
                 Box(
-                    modifier = Modifier.size(104.dp).clip(CircleShape)
-                        .border(3.dp, CameraWhite, CircleShape).padding(7.dp)
+                    modifier = Modifier.size(88.dp).clip(CircleShape)
+                        .border(3.dp, CameraWhite, CircleShape).padding(6.dp)
                         .border(2.dp, CameraWhite, CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Box(modifier = Modifier.size(54.dp).clip(CircleShape).background(CameraWhite))
+                    Box(modifier = Modifier.size(44.dp).clip(CircleShape).background(CameraWhite))
                 }
 
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.clickable { isVideoMode = !isVideoMode }
                 ) {
-                    Text("▣", color = CameraWhite, fontSize = 34.sp)
+                    Text("▣", color = CameraWhite, fontSize = 28.sp)
                     Text(if (isVideoMode) "PHOTO" else "VIDEO", color = CameraWhite, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
                 }
             }

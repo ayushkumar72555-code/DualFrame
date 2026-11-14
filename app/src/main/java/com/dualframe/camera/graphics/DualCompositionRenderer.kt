@@ -148,7 +148,7 @@ class DualCompositionRenderer(
         // Portrait frame centred over the backdrop.
         drawPass(
             (surfaceWidth * 0.28f).toInt(),
-            (surfaceHeight * 0.20f).toInt(),
+            (surfaceHeight * 0.31f).toInt(),
             (surfaceWidth * 0.44f).toInt(),
             (surfaceHeight * 0.49f).toInt(),
             9f / 16f,
