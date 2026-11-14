@@ -209,7 +209,7 @@ fun CameraScreen(onBack: () -> Unit) {
             }
 
             Row(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 28.dp, top = 12.dp),
+                modifier = Modifier.fillMaxWidth().padding(start = 28.dp, top = 12.dp, end = 28.dp),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
