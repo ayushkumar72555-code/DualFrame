@@ -176,7 +176,7 @@ fun CameraScreen(onBack: () -> Unit) {
 
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 val frameWidth = maxWidth * 0.89f
-                val frameHeight = frameWidth * 9f / 16f
+                val frameHeight = maxHeight * 0.22f
                 Box(
                     modifier = Modifier
                         .offset(x = maxWidth * 0.055f, y = maxHeight * 0.07f)
