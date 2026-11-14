@@ -1,170 +1,44 @@
-\# DualFrame
+# DualFrame
 
+A professional Android camera application designed to capture independently composed portrait and landscape photographs and videos from a shared camera stream.
 
+## Vision
 
-A professional Android camera application designed to
+DualFrame aims to provide two independent visual compositions from a single camera input.
 
-capture independently composed portrait and landscape
+### Output formats
 
-photographs and videos from a shared camera stream.
+- Portrait: 9:16
+- Landscape: 16:9
 
+## Technology stack
 
+- Kotlin
+- Jetpack Compose
+- Material 3
+- Camera2 API
+- OpenGL ES / EGL
+- MediaCodec
+- MediaMuxer
+- Hilt
+- Kotlin Coroutines
 
-\## Vision
-
-
-
-DualFrame aims to provide two independent visual
-
-compositions from a single camera input.
-
-
-
-\### Output Formats
-
-
-
-\- Portrait: 9:16
-
-\- Landscape: 16:9
-
-
-
-\## Technology Stack
-
-
-
-\- Kotlin
-
-\- Jetpack Compose
-
-\- Material 3
-
-\- Camera2 API
-
-\- OpenGL ES / EGL
-
-\- MediaCodec
-
-\- MediaMuxer
-
-\- Hilt
-
-\- Kotlin Coroutines
-
-
-
-\## Architecture
-
-
+## Architecture
 
 Clean Architecture with MVVM/MVI presentation.
 
+## Development status
 
+- Milestone 0: repository setup — completed.
+- Milestone 1: Android project foundation — implementation committed; local build verification pending.
+- Milestone 2: camera permissions and camera capability discovery — planned.
 
-\## Development Status
+See [Milestone 1 implementation and verification](docs/MILESTONE_1.md).
 
+## Minimum Android version
 
+Android 8.0 (API 26).
 
-Milestone 0: Project planning and repository setup.
-
-
-
-\## Minimum Android Version
-
-
-
-Android 8.0 (API 26)
-
-
-
-\## License
-
-
-
-To be decided.# DualFrame
-
-
-
-A professional Android camera application designed to
-
-capture independently composed portrait and landscape
-
-photographs and videos from a shared camera stream.
-
-
-
-\## Vision
-
-
-
-DualFrame aims to provide two independent visual
-
-compositions from a single camera input.
-
-
-
-\### Output Formats
-
-
-
-\- Portrait: 9:16
-
-\- Landscape: 16:9
-
-
-
-\## Technology Stack
-
-
-
-\- Kotlin
-
-\- Jetpack Compose
-
-\- Material 3
-
-\- Camera2 API
-
-\- OpenGL ES / EGL
-
-\- MediaCodec
-
-\- MediaMuxer
-
-\- Hilt
-
-\- Kotlin Coroutines
-
-
-
-\## Architecture
-
-
-
-Clean Architecture with MVVM/MVI presentation.
-
-
-
-\## Development Status
-
-
-
-Milestone 0: Project planning and repository setup.
-
-
-
-\## Minimum Android Version
-
-
-
-Android 8.0 (API 26)
-
-
-
-\## License
-
-
+## License
 
 To be decided.
-
