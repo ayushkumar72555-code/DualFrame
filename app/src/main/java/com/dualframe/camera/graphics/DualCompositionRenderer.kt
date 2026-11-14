@@ -153,11 +153,12 @@ class DualCompositionRenderer(
         } else {
             val pad = (surfaceHeight * 0.018f).toInt()
             val gap = (surfaceHeight * 0.014f).toInt()
-            val panelH = (surfaceHeight - 2 * pad - gap) / 2
-            val landscapeW = (panelH * 16f / 9f).toInt().coerceAtMost(surfaceWidth - 2 * pad)
-            drawPass((surfaceWidth - landscapeW) / 2, surfaceHeight - pad - panelH, landscapeW, panelH, 16f / 9f, 0f)
-            val portraitW = (panelH * 9f / 16f).toInt().coerceAtMost(surfaceWidth - 2 * pad)
-            drawPass((surfaceWidth - portraitW) / 2, pad, portraitW, panelH, 9f / 16f, 0f)
+            val landscapeW = surfaceWidth - 2 * pad
+            val landscapeH = (landscapeW * 9f / 16f).toInt()
+            drawPass(pad, surfaceHeight - pad - landscapeH, landscapeW, landscapeH, 16f / 9f, 0f)
+            val portraitH = surfaceHeight - 2 * pad - landscapeH - gap
+            val portraitW = (portraitH * 9f / 16f).toInt().coerceAtMost(surfaceWidth - 2 * pad)
+            drawPass((surfaceWidth - portraitW) / 2, pad, portraitW, portraitH, 9f / 16f, 0f)
         }
 
         GLES20.glDisableVertexAttribArray(POSITION_ATTRIBUTE)
