@@ -9,6 +9,7 @@ import android.net.Uri
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -43,6 +44,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -227,7 +229,22 @@ fun CameraScreen(onBack: () -> Unit) {
                             }
                         }
                     }
-                } else {
+                }
+                if (showGrid) {
+                    Canvas(Modifier.fillMaxSize()) {
+                        val thirdW = size.width / 3f
+                        val thirdH = size.height / 3f
+                        for (i in 1..2) {
+                            drawLine(Color.White.copy(alpha = 0.22f), Offset(thirdW * i, 0f), Offset(thirdW * i, size.height), strokeWidth = 1.dp.toPx())
+                            drawLine(Color.White.copy(alpha = 0.22f), Offset(0f, thirdH * i), Offset(size.width, thirdH * i), strokeWidth = 1.dp.toPx())
+                        }
+                    }
+                }
+                if (layoutMode == com.dualframe.camera.graphics.DualCompositionRenderer.Layout.STACKED) {
+                    // A subtle border clarifies the two independent compositions.
+                }
+                /* stacked view content continues */
+                if (false) {
                     Column(Modifier.fillMaxSize().padding(10.dp), verticalArrangement = Arrangement.SpaceBetween) {
                         Box(Modifier.fillMaxWidth().weight(1f).border(1.dp, Color(0xFFFACC15), androidx.compose.foundation.shape.RoundedCornerShape(12.dp)), contentAlignment = Alignment.TopStart) { Text("16:9 LANDSCAPE", color = Color(0xFFFACC15), fontSize = 10.sp, modifier = Modifier.padding(8.dp)) }
                         Spacer(Modifier.height(8.dp))
