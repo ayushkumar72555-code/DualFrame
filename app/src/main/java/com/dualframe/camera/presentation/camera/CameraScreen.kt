@@ -244,7 +244,7 @@ fun CameraScreen(onBack: () -> Unit) {
                     // A subtle border clarifies the two independent compositions.
                 }
                 /* stacked view content continues */
-                if (false) {
+                if (layoutMode == com.dualframe.camera.graphics.DualCompositionRenderer.Layout.STACKED) {
                     Column(Modifier.fillMaxSize().padding(10.dp), verticalArrangement = Arrangement.SpaceBetween) {
                         Box(Modifier.fillMaxWidth().weight(1f).border(1.dp, Color(0xFFFACC15), androidx.compose.foundation.shape.RoundedCornerShape(12.dp)), contentAlignment = Alignment.TopStart) { Text("16:9 LANDSCAPE", color = Color(0xFFFACC15), fontSize = 10.sp, modifier = Modifier.padding(8.dp)) }
                         Spacer(Modifier.height(8.dp))
